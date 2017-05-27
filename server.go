@@ -8,13 +8,13 @@ import . "github.com/ahmetb/go-linq"
 
 type ServerRoot string
 
-var serverRoot = ServerRoot{"/home/pi/data"}
+var serverRoot = ServerRoot("/home/pi/data")
 
 func main() {
 	router := gin.Default()
 
 	router.GET("/files", func(c *gin.Context) {
-		files, err := ioutil.ReadDir(serverRoot)
+		files, err := ioutil.ReadDir(string(serverRoot))
 		if err != nil {
 			c.String(http.StatusInternalServerError, "%s", err)
 		} else {
