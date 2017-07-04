@@ -1,0 +1,20 @@
+package messaging
+
+type Message struct {
+	Filename  string
+	Filenames []string
+	Contents  string
+}
+
+type Action func(msg Message) Result
+
+type Payload struct {
+	Message Message
+	Action  Action
+	Done    chan struct{}
+}
+
+type Result struct {
+	Message
+	Error error
+}
