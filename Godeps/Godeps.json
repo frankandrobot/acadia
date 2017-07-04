@@ -9,27 +9,27 @@
 			"Rev": "67424dce7b47e42b7f2373557878fd6e3f2d8c44"
 		},
 		{
+			"ImportPath": "github.com/gin-contrib/sse",
+			"Rev": "22d885f9ecc78bf4ee5d72b937e4bbcdc58e8cae"
+		},
+		{
 			"ImportPath": "github.com/gin-gonic/gin",
-			"Comment": "v1.1.4-1-gd5b353c",
-			"Rev": "d5b353c5d5a560322e6d96121c814115562501f7"
+			"Comment": "v1.2-13-g92ddc7d",
+			"Rev": "92ddc7d2405b441d5fc9b64e938628dec1382759"
 		},
 		{
 			"ImportPath": "github.com/gin-gonic/gin/binding",
-			"Comment": "v1.1.4-1-gd5b353c",
-			"Rev": "d5b353c5d5a560322e6d96121c814115562501f7"
+			"Comment": "v1.2-13-g92ddc7d",
+			"Rev": "92ddc7d2405b441d5fc9b64e938628dec1382759"
 		},
 		{
 			"ImportPath": "github.com/gin-gonic/gin/render",
-			"Comment": "v1.1.4-1-gd5b353c",
-			"Rev": "d5b353c5d5a560322e6d96121c814115562501f7"
+			"Comment": "v1.2-13-g92ddc7d",
+			"Rev": "92ddc7d2405b441d5fc9b64e938628dec1382759"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
 			"Rev": "fec3b39b059c0f88fa6b20f5ed012b1aa203a8b4"
-		},
-		{
-			"ImportPath": "github.com/manucorporat/sse",
-			"Rev": "ee05b128a739a0fb76c7ebd3ae4810c1de808d6d"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-isatty",
@@ -37,8 +37,8 @@
 			"Rev": "fc9e8d8ef48496124e79ae0df75490096eccf6fe"
 		},
 		{
-			"ImportPath": "golang.org/x/net/context",
-			"Rev": "513929065c19401a1c7b76ecd942f9f86a0c061b"
+			"ImportPath": "github.com/ugorji/go/codec",
+			"Rev": "5efa3251c7f7d05e5d9704a69a984ec9f1386a40"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",

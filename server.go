@@ -1,15 +1,12 @@
 package main
 
 import (
-	. "github.com/ahmetb/go-linq"
-	"github.com/labstack/echo"
-	"io/ioutil"
-	"net/http"
-	"os"
-
 	"fmt"
+	"github.com/frankandrobot/acadia/file"
 	"github.com/frankandrobot/acadia/messaging"
 	"github.com/frankandrobot/acadia/queue"
+	"github.com/labstack/echo"
+	"net/http"
 )
 
 // CONFIG
@@ -27,24 +24,14 @@ func main() {
 	queue := queue.Queue()
 
 	router.GET("/files", func(c echo.Context) error {
-		done := make(chan messaging.Result)
 		payload := messaging.Payload{
 			Action: func() messaging.Result {
-				var result messaging.Result
-				files, err := ioutil.ReadDir(string(serverRoot))
-				if err != nil {
-					result.Error = err
-					return result
-				}
-				From(files).
-					SelectT(func(c os.FileInfo) string { return c.Name() }).
-					ToSlice(&result.Filenames)
-				return result
+				return file.LoadDir(string(serverRoot))
 			},
-			Done: done,
+			Done: make(chan messaging.Result),
 		}
 		go func() { queue <- payload }()
-		result := <-done
+		result := <-payload.Done
 		if result.Error != nil {
 			return c.String(http.StatusInternalServerError, fmt.Sprintf("%s", result.Error))
 		}
