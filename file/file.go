@@ -5,31 +5,32 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/frankandrobot/acadia/messaging"
+	"fmt"
+	"time"
 )
 
-func LoadDir(dir string) messaging.Result {
-	var result messaging.Result
+type Root string
+type BaseFilename string
+type Contents string
+
+func LoadDir(dir string) ([]string, error) {
 	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		result.Error = err
-		return result
-	}
+	var filenames []string
 	From(files).
 		SelectT(func(c os.FileInfo) string { return c.Name() }).
-		ToSlice(&result.Filenames)
-	return result
+		ToSlice(&filenames)
+	return filenames, err
 }
 
-// func SaveFileFn(msg fileCommandPayload) error {
-// 	now := time.Now().Unix()
-// 	filename := fmt.Sprintf(
-// 		"%s/%s-%d",
-// 		string(serverRoot),
-// 		msg.Filename,
-// 		now)
-// 	return ioutil.WriteFile(filename, []byte(msg.Contents), 0644)
-// }
+func SaveFile(root Root, baseFilename BaseFilename, contents Contents) error {
+	now := time.Now().Unix()
+	filename := fmt.Sprintf(
+		"%s/%s-%d",
+		root,
+		baseFilename,
+		now)
+	return ioutil.WriteFile(filename, []byte(string(contents)), 0644)
+}
 
 // // List all files then get the matching one with the latest timestamp
 // func LoadFileFn(msg fileCommandPayload) (string, error) {

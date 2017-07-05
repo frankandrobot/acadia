@@ -6,15 +6,9 @@ type Message struct {
 	Contents  string
 }
 
-type Action func() Result
+type Action func() ChanResult
 
-type Result struct {
+type ChanResult struct {
 	Message
 	Error error
-}
-
-type Payload struct {
-	Message Message
-	Action  Action
-	Done    chan Result
 }

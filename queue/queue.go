@@ -4,8 +4,16 @@ import (
 	"github.com/frankandrobot/acadia/messaging"
 )
 
-func Queue() chan messaging.Payload {
-	queue := make(chan messaging.Payload)
+type Payload struct {
+	Message messaging.Message
+	Action  messaging.Action
+	Done    chan messaging.ChanResult
+}
+
+type Queue chan Payload
+
+func MakeQueue() Queue {
+	queue := make(chan Payload)
 	go func() {
 		for {
 			payload := <-queue
@@ -16,6 +24,11 @@ func Queue() chan messaging.Payload {
 	return queue
 }
 
-type Contents struct {
-	Contents string `form:"contents" json:"contents" binding:"required"`
+func (q Queue) Add(action messaging.Action) messaging.ChanResult {
+	payload := Payload{
+		Action: action,
+		Done:   make(chan messaging.ChanResult),
+	}
+	go func() { q <- payload }()
+	return <-payload.Done
 }

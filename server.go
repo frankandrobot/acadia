@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/frankandrobot/acadia/file"
 	"github.com/frankandrobot/acadia/messaging"
 	"github.com/frankandrobot/acadia/queue"
@@ -19,21 +18,25 @@ var serverRoot = ServerRoot("/home/pi/data")
 var serverKey = ServerKey("/home/pi/server.key")
 var serverCert = ServerCer("/home/pi/server.crt")
 
+type contents struct {
+	Contents string `form:"contents" json:"contents" binding:"required"`
+}
+
 func main() {
 	router := echo.New()
-	queue := queue.Queue()
+	queue := queue.MakeQueue()
 
 	router.GET("/files", func(c echo.Context) error {
-		payload := messaging.Payload{
-			Action: func() messaging.Result {
-				return file.LoadDir(string(serverRoot))
-			},
-			Done: make(chan messaging.Result),
+		action := func() messaging.ChanResult {
+			files, err := file.LoadDir(string(serverRoot))
+			result := messaging.ChanResult{}
+			result.Filenames = files
+			result.Error = err
+			return result
 		}
-		go func() { queue <- payload }()
-		result := <-payload.Done
+		result := queue.Add(action)
 		if result.Error != nil {
-			return c.String(http.StatusInternalServerError, fmt.Sprintf("%s", result.Error))
+			return result.Error
 		}
 		return c.JSON(http.StatusOK, result.Filenames)
 	})
@@ -54,27 +57,28 @@ func main() {
 	// 	channels.Load <- payload
 	// })
 
-	// router.POST("/files/:name", func(c *gin.Context) {
-	// 	context := c.Copy()
-	// 	name := c.Param("name")
-	// 	var json contents
-	// 	err := c.BindJSON(&json)
-	// 	if err != nil {
-	// 		c.String(http.StatusInternalServerError, "%s", err)
-	// 		return
-	// 	}
-	// 	payload := fileCommandPayload{}
-	// 	payload.Filename = name
-	// 	payload.Contents = json.Contents
-	// 	payload.HandleResult = func(result fileCommandResult) {
-	// 		if result.Error == nil {
-	// 			context.String(http.StatusOK, "")
-	// 		} else {
-	// 			context.String(http.StatusInternalServerError, "%s", result.Error)
-	// 		}
-	// 	}
-	// 	channels.Save <- payload
-	// })
+	router.POST("/files/:name", func(c echo.Context) error {
+		name := c.Param("name")
+		doc := new(contents)
+		if err := c.Bind(doc); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+		action := func() messaging.ChanResult {
+			err := file.SaveFile(
+				file.Root(serverRoot),
+				file.BaseFilename(name),
+				file.Contents(doc.Contents),
+			)
+			result := messaging.ChanResult{}
+			result.Error = err
+			return result
+		}
+		result := queue.Add(action)
+		if result.Error != nil {
+			return result.Error
+		}
+		return c.JSON(http.StatusOK, doc)
+	})
 
 	router.StartTLS(":8080", string(serverCert), string(serverKey))
 }
