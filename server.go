@@ -25,10 +25,11 @@ type contents struct {
 func main() {
 	router := echo.New()
 	queue := queue.MakeQueue()
+	fileIO := file.NewFileIO()
 
 	router.GET("/files", func(c echo.Context) error {
 		action := func() messaging.ChanResult {
-			files, err := file.LoadDir(string(serverRoot))
+			files, err := fileIO.LoadDir(string(serverRoot))
 			result := messaging.ChanResult{}
 			result.Filenames = files
 			result.Error = err
@@ -41,21 +42,24 @@ func main() {
 		return c.JSON(http.StatusOK, result.Filenames)
 	})
 
-	// router.GET("/files/:name", func(c *gin.Context) {
-	// 	name := c.Param("name")
-	// 	filename := fmt.Sprintf("%s/%s", string(serverRoot), name)
-	// 	payload := fileCommandPayload{}
-	// 	payload.Context = c.Copy()
-	// 	payload.Filename = filename
-	// 	payload.HandleResult = func(result fileCommandResult) {
-	// 		if result.Error == nil {
-	// 			result.Context.String(http.StatusOK, "%s", result.Contents)
-	// 		} else {
-	// 			result.Context.String(http.StatusNotFound, "")
-	// 		}
-	// 	}
-	// 	channels.Load <- payload
-	// })
+	router.GET("/files/:name", func(c echo.Context) error {
+		name := c.Param("name")
+		action := func() messaging.ChanResult {
+			contents, err := fileIO.LoadFile(
+				file.Root(serverRoot),
+				file.BaseFilename(name),
+			)
+			result := messaging.ChanResult{}
+			result.Contents = contents
+			result.Error = err
+			return result
+		}
+		result := queue.Add(action)
+		if result.Error != nil {
+			return result.Error
+		}
+		return c.JSON(http.StatusOK, contents{Contents: result.Contents})
+	})
 
 	router.POST("/files/:name", func(c echo.Context) error {
 		name := c.Param("name")
@@ -64,7 +68,7 @@ func main() {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
 		action := func() messaging.ChanResult {
-			err := file.SaveFile(
+			err := fileIO.SaveFile(
 				file.Root(serverRoot),
 				file.BaseFilename(name),
 				file.Contents(doc.Contents),
