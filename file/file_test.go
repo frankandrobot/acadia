@@ -73,61 +73,72 @@ func TestLoadDir(t *testing.T) {
 }
 
 func TestLoadFile(t *testing.T) {
-	fileIO := FileIO{
-		readDir: func(dirname string) ([]os.FileInfo, error) {
-			if dirname != "root" {
-				t.Errorf("LoadFile wanted root got %s", dirname)
-			}
-			return []os.FileInfo{
-					fileInfo{name: "file-1"},
-					fileInfo{name: "file-3"},
-					fileInfo{name: "file-2"},
-					fileInfo{name: "anotherfile-1"},
+	cases := []struct {
+		message       string
+		input         string
+		expectedError error
+		fileIO        FileIO
+	}{
+		{
+			message:       "Basic case",
+			input:         "file",
+			expectedError: nil,
+			fileIO: FileIO{
+				readDir: func(dirname string) ([]os.FileInfo, error) {
+					if dirname != "root" {
+						t.Errorf("LoadFile wanted root got %s", dirname)
+					}
+					return []os.FileInfo{
+							fileInfo{name: "file-1"},
+							fileInfo{name: "file-3"},
+							fileInfo{name: "file-2"},
+							fileInfo{name: "anotherfile-1"},
+						},
+						nil
 				},
-				nil
-		},
-		readFile: func(filename string) ([]byte, error) {
-			if filename != "root/file-3" {
-				t.Errorf("LoadFile wanted file got %s", filename)
-			}
-			return []byte("Hello world!"), nil
-		},
-	}
-	contents, err := fileIO.LoadFile(Root("root"), BaseFilename("file"))
-	if err != nil {
-		t.Errorf("LoadFile expected no error, got %s", err)
-	}
-	if string(contents) != "Hello world!" {
-		t.Errorf("LoadFile expected Hello world!, got %s", contents)
-	}
-}
-
-func TestLoadFile_WorksWithWierdNames(t *testing.T) {
-	fileIO := FileIO{
-		readDir: func(dirname string) ([]os.FileInfo, error) {
-			if dirname != "root" {
-				t.Errorf("LoadFile wanted root got %s", dirname)
-			}
-			return []os.FileInfo{
-					fileInfo{name: "file-1-5"},
-					fileInfo{name: "file-1-2"},
-					fileInfo{name: "file-1-1"},
-					fileInfo{name: "anotherfile-1"},
+				readFile: func(filename string) ([]byte, error) {
+					if filename != "root/file-3" {
+						t.Errorf("LoadFile wanted file got %s", filename)
+					}
+					return []byte("Hello world!"), nil
 				},
-				nil
+			},
 		},
-		readFile: func(filename string) ([]byte, error) {
-			if filename != "root/file-1-5" {
-				t.Errorf("LoadFile got %s", filename)
-			}
-			return []byte("Hello world!"), nil
+		{
+			message:       "works with wierd names",
+			input:         "file-1",
+			expectedError: nil,
+			fileIO: FileIO{
+				readDir: func(dirname string) ([]os.FileInfo, error) {
+					if dirname != "root" {
+						t.Errorf("LoadFile wanted root got %s", dirname)
+					}
+					return []os.FileInfo{
+							fileInfo{name: "file-1-5"},
+							fileInfo{name: "file-1-2"},
+							fileInfo{name: "file-1-1"},
+							fileInfo{name: "anotherfile-1"},
+						},
+						nil
+				},
+				readFile: func(filename string) ([]byte, error) {
+					if filename != "root/file-1-5" {
+						t.Errorf("LoadFile got %s", filename)
+					}
+					return []byte("Hello world!"), nil
+				},
+			},
 		},
 	}
-	contents, err := fileIO.LoadFile(Root("root"), BaseFilename("file-1"))
-	if err != nil {
-		t.Errorf("LoadFile expected no error, got %s", err)
-	}
-	if string(contents) != "Hello world!" {
-		t.Errorf("LoadFile expected Hello world!, got %s", contents)
+	for _, c := range cases {
+		contents, err := c.fileIO.LoadFile(Root("root"), BaseFilename(c.input))
+		if err != c.expectedError {
+			t.Errorf("LoadFile %s: got %s instead of %s",
+				c.message, err, c.expectedError)
+		}
+		if string(contents) != "Hello world!" {
+			t.Errorf("LoadFile %s: expected Hello world!, got %s",
+				c.message, contents)
+		}
 	}
 }
