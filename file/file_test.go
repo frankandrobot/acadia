@@ -72,6 +72,116 @@ func TestLoadDir(t *testing.T) {
 	}
 }
 
+func TestSaveFile(t *testing.T) {
+	cases := []struct {
+		message           string
+		inputBaseFilename string
+		inputContents     string
+		expectedError     error
+		fileIO            FileIO
+		only              bool
+	}{
+		{
+			message:           "works when file does not exist",
+			inputBaseFilename: "file",
+			inputContents:     "contents",
+			expectedError:     nil,
+			fileIO: FileIO{
+				readDir: func(dirname string) ([]os.FileInfo, error) {
+					if dirname != "root" {
+						t.Errorf("SaveFile wanted root got %s", dirname)
+					}
+					return []os.FileInfo{}, nil
+				},
+				writeFile: func(filename string, contents []byte, perm os.FileMode) error {
+					if filename != "root/file-0" {
+						t.Errorf("SaveFile wanted file got %s", filename)
+					}
+					if string(contents) != "contents" {
+						t.Errorf("SaveFile wanted contents got %s", contents)
+					}
+					if perm != 0644 {
+						t.Errorf("SaveFile got wrong perms")
+					}
+					return nil
+				},
+			},
+		},
+		{
+			message:           "works when file is unversioned",
+			inputBaseFilename: "file",
+			inputContents:     "contents",
+			expectedError:     nil,
+			fileIO: FileIO{
+				readDir: func(dirname string) ([]os.FileInfo, error) {
+					if dirname != "root" {
+						t.Errorf("SaveFile wanted root got %s", dirname)
+					}
+					return []os.FileInfo{
+							fileInfo{name: "file"},
+							fileInfo{name: "anotherfile-1"},
+						},
+						nil
+				},
+				writeFile: func(filename string, contents []byte, perm os.FileMode) error {
+					if filename != "root/file-0" {
+						t.Errorf("SaveFile wanted file got %s", filename)
+					}
+					if string(contents) != "contents" {
+						t.Errorf("SaveFile wanted contents got %s", contents)
+					}
+					if perm != 0644 {
+						t.Errorf("SaveFile got wrong perms")
+					}
+					return nil
+				},
+			},
+		},
+		{
+			message:           "works when file is versioned",
+			inputBaseFilename: "file",
+			inputContents:     "contents",
+			expectedError:     nil,
+			fileIO: FileIO{
+				readDir: func(dirname string) ([]os.FileInfo, error) {
+					if dirname != "root" {
+						t.Errorf("SaveFile wanted root got %s", dirname)
+					}
+					return []os.FileInfo{
+							fileInfo{name: "file-0"},
+							fileInfo{name: "file-2"},
+							fileInfo{name: "file-1"},
+							fileInfo{name: "anotherfile-1"},
+						},
+						nil
+				},
+				writeFile: func(filename string, contents []byte, perm os.FileMode) error {
+					if filename != "root/file-3" {
+						t.Errorf("SaveFile: wanted root/file-3 got %s", filename)
+					}
+					if string(contents) != "contents" {
+						t.Errorf("SaveFile wanted contents got %s", contents)
+					}
+					if perm != 0644 {
+						t.Errorf("SaveFile got wrong perms")
+					}
+					return nil
+				},
+			},
+		},
+	}
+	for _, c := range cases {
+		err := c.fileIO.SaveFile(
+			Root("root"),
+			BaseFilename(c.inputBaseFilename),
+			Contents(c.inputContents))
+		if err != c.expectedError {
+			t.Errorf("LoadsaveFile %s: got %s instead of %s",
+				c.message, err, c.expectedError)
+		}
+	}
+}
+
 func TestLoadFile(t *testing.T) {
 	cases := []struct {
 		message       string

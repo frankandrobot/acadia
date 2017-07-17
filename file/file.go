@@ -9,24 +9,46 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"time"
 )
 
 type Root string
 type BaseFilename string
 type Contents string
 
-type nowTime func() time.Time
 type writeFile func(filename string, data []byte, perm os.FileMode) error
 type readDir func(dirname string) ([]os.FileInfo, error)
 type readFile func(filename string) ([]byte, error)
 
-// get only the ones that match the filename and get the latest
-var timestampRegexp = regexp.MustCompile("^.+-(.+)$")
-var nameRegexp = regexp.MustCompile("^(.+)-.+$")
+var versionRegex = regexp.MustCompile("^.+-(.+)$") // gets the version
+var nameRegex = regexp.MustCompile("^(.+)-.+$")    // gets the filename
+
+// baseFilename gets the baseFilename from a versionedFilename.
+// Ex: "foobar-0" => "foobar"
+func getBaseFilename(versionedFilename string) (string, bool) {
+	matches := nameRegex.FindStringSubmatch(versionedFilename)
+	if len(matches) == 0 {
+		return "", false
+	}
+	return matches[len(matches)-1], true
+}
+
+// getFileVersion gets the file version from a versionedFilename.
+// Ex: "foobar-0" => 0
+func getFileVersion(versionedFilename string) (int, bool) {
+	// Sigh. We have to use this clunky thing
+	matches := versionRegex.FindStringSubmatch(versionedFilename)
+	if len(matches) == 0 {
+		return 0, false
+	}
+	version := matches[len(matches)-1]
+	n, err := strconv.Atoi(version)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
 
 type FileIO struct {
-	nowTime   nowTime
 	readDir   readDir
 	writeFile writeFile
 	readFile  readFile
@@ -40,18 +62,24 @@ func (f FileIO) LoadDir(dir string) ([]string, error) {
 	var filenames []string
 	From(files).
 		SelectT(func(c os.FileInfo) string { return c.Name() }).
+		// group filenames by base filename
 		GroupByT(
-			func(name string) string {
-				matches := nameRegexp.FindStringSubmatch(name)
-				if len(matches) > 0 {
-					return matches[len(matches)-1]
+			func(versionedFilename string) string {
+				baseFilename, ok := getBaseFilename(versionedFilename)
+				if ok {
+					return baseFilename
 				}
-				return name
+				// if !ok it's actually not a versioned filename
+				return versionedFilename
 			},
-			func(name string) string { return name },
+			func(versionedFilename string) string {
+				return versionedFilename
+			},
 		).
+		// then get just the distinct group names
 		SelectT(func(g Group) string { return g.Key.(string) }).
 		Distinct().
+		// then alpha sort
 		SortT(func(a string, b string) bool { return a < b }).
 		ToSlice(&filenames)
 	return filenames, nil
@@ -62,12 +90,45 @@ func (f FileIO) SaveFile(
 	baseFilename BaseFilename,
 	contents Contents,
 ) error {
-	now := f.nowTime().Unix()
+	// get the latest version of the baseFilename
+	files, err := f.readDir(string(root))
+	if err != nil {
+		return err
+	}
+	var filenames []string
+	From(files).
+		SelectT(func(c os.FileInfo) string { return c.Name() }).
+		// get all the filenames that match the baseFilename
+		WhereT(func(versionedFilename string) bool {
+			thisname, ok := getBaseFilename(versionedFilename)
+			if ok {
+				return thisname == string(baseFilename)
+			}
+			return false
+		}).
+		// then order by version
+		OrderByDescendingT(func(versionedFilename string) int {
+			version, ok := getFileVersion(versionedFilename)
+			if ok {
+				return version
+			}
+			return 0
+		}).
+		ToSlice(&filenames)
+	latestVersion := 0
+	if len(filenames) > 0 {
+		latest := filenames[0]
+		var ok bool // look ma, := definition leads to a bug!
+		latestVersion, ok = getFileVersion(latest)
+		if ok {
+			latestVersion = latestVersion + 1
+		}
+	}
 	filename := fmt.Sprintf(
 		"%s/%s-%d",
 		root,
 		baseFilename,
-		now)
+		latestVersion)
 	return f.writeFile(filename, []byte(string(contents)), 0644)
 }
 
@@ -80,18 +141,18 @@ func (f FileIO) LoadFile(root Root, baseFilename BaseFilename) (string, error) {
 	}
 	var filenames []string
 	From(files).
-		SelectT(func(c os.FileInfo) string {
-			return c.Name()
+		SelectT(func(c os.FileInfo) string { return c.Name() }).
+		// get all filenames that match the baseFilename
+		WhereT(func(versionedFilename string) bool {
+			thisname, ok := getBaseFilename(versionedFilename)
+			if ok {
+				return thisname == string(baseFilename)
+			}
+			return false
 		}).
-		WhereT(func(c string) bool {
-			nameRegexp := regexp.MustCompile("^" + string(baseFilename) + "-.+$")
-			return nameRegexp.MatchString(c)
-		}).
-		OrderByDescendingT(func(name string) int {
-			// Sigh. We have to use this clunky thing
-			matches := timestampRegexp.FindStringSubmatch(name)
-			timestamp := matches[len(matches)-1]
-			n, _ := strconv.Atoi(timestamp)
+		// then sort by version
+		OrderByDescendingT(func(versionedFilename string) int {
+			n, _ := getFileVersion(versionedFilename)
 			return n
 		}).
 		ToSlice(&filenames)
@@ -106,7 +167,6 @@ func (f FileIO) LoadFile(root Root, baseFilename BaseFilename) (string, error) {
 
 func NewFileIO() FileIO {
 	return FileIO{
-		nowTime:   func() time.Time { return time.Now() },
 		readDir:   ioutil.ReadDir,
 		writeFile: ioutil.WriteFile,
 		readFile:  ioutil.ReadFile,
